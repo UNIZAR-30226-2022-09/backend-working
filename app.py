@@ -795,17 +795,14 @@ def guardarId(Publis,id):
     publicaciones = select([Publicacion.id,Publicacion.timestamp,Publicacion.descripcion ,Publicacion.Usuario_Nicka]).where(Publicacion.id == id )
     results = db.session.execute(publicaciones)
     for a in results: 
-        print(a)
         x = select([Usuario.Nombre_de_usuario, Usuario.foto_de_perfil, Usuario.nick]).where((Usuario.nick == a.Usuario_Nicka))
         resultb = db.session.execute(x)
         for b in resultb: 
             Nombre_de_usuario= str(b.Nombre_de_usuario)
             foto_de_perfil=str(b.foto_de_perfil)
 
-
             ids=str(a.id)
             Gustas=str(db.session.query(func.count(Gusta.id).filter(Gusta.id == a.id)).scalar())
-            print (Gustas)
             Comentarios=str(db.session.query(Comenta).filter(Comenta.idPubli == a.id ).count())
             Guardados=(db.session.query(Guarda).filter(Guarda.id == a.id).count())
             descripciones=str(a.descripcion)
@@ -813,7 +810,6 @@ def guardarId(Publis,id):
         
             pdf = Propia.query.filter_by(id=a.id).first()
             if pdf :
-                #print("es un pdf este numero: " , a.id)
                 pdfname , portadaname = cargarDatosPDFstr(pdfname,portadaname,a.id)
                 Publis.append(Pdfs(b.nick,Nombre_de_usuario,foto_de_perfil,ids,descripciones,timestamps,Gustas,Guardados,Comentarios,pdfname,portadaname))
             else:
@@ -831,23 +827,24 @@ def mostrarRecomendacionesPaginadas(current_user):
     offsetreal = 0
     limite=request.headers['limit']
     offsetreal = int(request.headers['offset'])*int(limite)
-    #todosGuardados=Guarda.query.filter_by(Usuario_Nicka=current_user).all()
-    recomendacion = select([Recomendacion.id ]).where(Recomendacion.Usuario_Nicka == request.headers['nick'] ).order_by(Recomendacion.id.desc()).limit(int(limite)).offset(int(offsetreal))
+    recomendacion = select([Recomendacion.id ]).where(Recomendacion.Usuario_Nicka == request.headers['nick'] ).order_by(Recomendacion.id.asc()).limit(int(limite)).offset(int(offsetreal))
     recomendaciones = db.session.execute(recomendacion)
 
+
     for ids in recomendaciones:
-        print("vamos: ", ids.id)
+        print("Se estan guardando en este orden: ", ids.id , " limite: ",limite, " offsetreal: ",offsetreal)
         guardarId(Publis,ids.id)
 
     if len(Publis) == 0:
-        print("hola", " offset: ", offsetreal, "limite: ", limite)
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
 
-    Publis.sort(key = customSort, reverse=True)
+    burbuja(Publis)
+    #Publis.sort(key = customSort, reverse=True)
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis)):
+        print("Se MUESTRA EN ESTE ORDEN: ", Publis[x].ids)
         guardaRecomendacion(Publis[x],finalDictionary,current_user)
         i = i + 1
     
@@ -862,20 +859,19 @@ def mostrarArticulosPaginados(current_user):
     offsetreal = 0
     limite=request.headers['limit']
     offsetreal = int(request.headers['offset'])*int(limite)
-    #todosGuardados=Guarda.query.filter_by(Usuario_Nicka=current_user).all()
-    propias = select([Propia.id ]).where(Propia.Usuario_Nicka == request.headers['nick'] ).order_by(Propia.id.desc()).limit(int(limite)).offset(int(offsetreal))
+    propias = select([Propia.id ]).where(Propia.Usuario_Nicka == request.headers['nick'] ).order_by(Propia.id.asc()).limit(int(limite)).offset(int(offsetreal))
     results = db.session.execute(propias)
     for ids in results:
-        print("vamos: ", ids.id)
         guardarId(Publis,ids.id)
 
+    burbuja(Publis)
     if len(Publis) == 0:
-        print("hola", " offset: ", offsetreal, "limite: ", limite)
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis)):
+        print("Se MUESTRA EN ESTE ORDEN: ", Publis[x].ids)
         guardaPDF(Publis[x],finalDictionary,current_user)
         i = i + 1
     
@@ -893,7 +889,7 @@ def mostrarGuardadosPaginados(current_user):
     #todosGuardados=Guarda.query.filter_by(Usuario_Nicka=current_user).all()
     Publis = []
     
-    todosGuardados=select([Guarda.id ]).where(Guarda.Usuario_Nicka == current_user ).order_by(Guarda.id.desc()).limit(int(limite)).offset(int(offsetreal))
+    todosGuardados=select([Guarda.id ]).where(Guarda.Usuario_Nicka == current_user ).order_by(Guarda.id.asc()).limit(int(limite)).offset(int(offsetreal))
     todosGuardados = db.session.execute(todosGuardados)
     for ids in todosGuardados:
         guardarId(Publis,ids.id)
@@ -901,10 +897,12 @@ def mostrarGuardadosPaginados(current_user):
     if len(Publis) == 0:
         print("hola", " offset: ", offsetreal, "limite: ", limite)
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
+    
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis)):
+            print("Se MUESTRA EN ESTE ORDEN: ", Publis[x].ids)
             existe = db.session.query(Propia).filter(Propia.id == Publis[x].ids ).count()
                 #ver si ese ID existe en recomendacion sino es un post propio
             if bool(existe):
@@ -926,7 +924,7 @@ def GuardadosArticulosPaginados(current_user):
     offsetreal = int(request.headers['offset'])*int(limite)
     
     
-    todosGuardados=select([Guarda.id, Guarda.Usuario_Nicka ]).where(and_(Guarda.tipo==1 , Guarda.Usuario_Nicka == current_user)) .order_by(Guarda.id.desc()).limit(int(limite)).offset(int(offsetreal)).distinct()
+    todosGuardados=select([Guarda.id, Guarda.Usuario_Nicka ]).where(and_(Guarda.tipo==1 , Guarda.Usuario_Nicka == current_user)).order_by(Guarda.id.desc()).limit(int(limite)).offset(int(offsetreal)).distinct()
     todosGuardados = db.session.execute(todosGuardados)
     
 
@@ -942,6 +940,7 @@ def GuardadosArticulosPaginados(current_user):
     i=0
     x=0
     for x in  range(len(Publis)):
+            print("Se MUESTRA EN ESTE ORDEN: ", Publis[x].ids)
             existe = db.session.query(Propia).filter(Propia.id == Publis[x].ids ).count()
                 #ver si ese ID existe en recomendacion sino es un post propio
             if bool(existe):
@@ -960,7 +959,7 @@ def GuardadosRecomendacionesPaginados(current_user):
     offsetreal = int(request.headers['offset'])*int(limite)
 
     
-    todosGuardados=select([Guarda.id ]).where(and_(Guarda.tipo==2 , Guarda.Usuario_Nicka == current_user)) .order_by(Guarda.id.desc()).limit(int(limite)).offset(int(offsetreal)).distinct()
+    todosGuardados=select([Guarda.id ]).where(and_(Guarda.tipo==2 , Guarda.Usuario_Nicka == current_user)).order_by(Guarda.id.desc()).limit(int(limite)).offset(int(offsetreal)).distinct()
     todosGuardados = db.session.execute(todosGuardados)
     for ids in todosGuardados:
         print("vamos: ", ids.id)
@@ -973,6 +972,7 @@ def GuardadosRecomendacionesPaginados(current_user):
     i=0
     x=0
     for x in  range(len(Publis)):
+            print("Se MUESTRA EN ESTE ORDEN: ", Publis[x].ids)
             existe = db.session.query(Recomendacion).filter(Recomendacion.id == Publis[x].ids ).count()
                 #ver si ese ID existe en recomendacion sino es un post propio
             if bool(existe):
@@ -1001,28 +1001,26 @@ def HomePaginado(current_user):
             guardarId(Publis,posteos.id)
 
 
-    
     #ordenar por id
-    Publis.sort(key = customSort, reverse=True)
+    #Publis.sort(key = customSort, reverse=True)
 
     Publis2=[]
     for i in range (int(offsetreal), int(offsetreal) + int(limite)):
-        #print("x es = ", x , "i es: ", i ," offset: ", offsetreal, "limite: ", limite, "publis[i]: ", Publis[i])
         if i< len(Publis): 
-            print("i es: ", i ,"len publis: ", len(Publis))
+            print("Publis[i].id es: ", Publis[i].ids )
             Publis2.append(Publis[i])
 
     if len(Publis2) == 0:
-        print("hola", " offset: ", offsetreal, "limite: ", limite)
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
 
+    #Publis.sort(key = customSort, reverse=True)
+    burbuja(Publis2)
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis2)):
+            print("Se MUESTRA EN ESTE ORDEN: ", Publis2[x].ids)
             existe = db.session.query(Propia).filter(Propia.id == Publis2[x].ids ).count()
-                #ver si ese ID existe en recomendacion sino es un post propio
-            #print(" postesos despues: ", Publis2[x].ids)
             if bool(existe):
                 guardaPDF(Publis2[x],finalDictionary,current_user)
                 i = i + 1
@@ -1061,17 +1059,6 @@ def cargarDatosRecomendacionesstr(links,titulos,autores,id):
 @token_required
 def Populares(current_user):
 
-
-# class Trata_pub_del_tema(db.Model):
-
-#     id = db.Column(db.Integer, db.ForeignKey('publicacion.id'),primary_key=True)
-#     tema = db.Column(db.String(50), db.ForeignKey('tematica.tema'),primary_key=True)
-
-# class Prefiere(db.Model):
-
-#     Usuario_Nicka = db.Column(db.String(20), db.ForeignKey('usuario.nick'),primary_key=True)
-#     tema = db.Column(db.String(50), db.ForeignKey('tematica.tema'),primary_key=True)
-
     Publis = []
     limite=request.headers['limit']
     todosUsuarios = Usuario.query.all()
@@ -1098,7 +1085,6 @@ def Populares(current_user):
 
                 for posteos in posts:
                     pref = False
-                    print("PREFERIDAS: ",preferidas )
                     for temas in preferidas:
                         
                         prefiere = Trata_pub_del_tema.query.filter_by(id=posteos.id ,tema= temas).first()
@@ -1110,16 +1096,10 @@ def Populares(current_user):
 
                     if pref ==True:
                         guardarId(Publis,posteos.id)
-            # else:
-            #     print(leSigue)
-            #     print("este user: ", current_user , " sigue a este: ",nicks.nick  )
 
 
 
     Publis.sort(key = orderLikes, reverse=True)
-
-    # for x in  range(len(Publis)):
-    #     print("MEGUSTAS DE ID: ", Publis[x].ids ," gustas: ", Publis[x].Gustas )
 
     Publis2=[]
     for i in range (0, int(limite)):
@@ -1129,7 +1109,6 @@ def Populares(current_user):
             Publis2.append(Publis[i])
 
     if len(Publis2) == 0:
-        # print("hola", "limite: ", limite)
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
 
     finalDictionary = {}
@@ -1137,8 +1116,6 @@ def Populares(current_user):
     x=0
     for x in  range(len(Publis2)):
             existe = db.session.query(Propia).filter(Propia.id == Publis2[x].ids ).count()
-                #ver si ese ID existe en recomendacion sino es un post propio
-            #print(" postesos despues: ", Publis2[x].ids)
             if bool(existe):
                 guardaPDF(Publis2[x],finalDictionary,current_user)
                 i = i + 1
@@ -1172,14 +1149,12 @@ def PopularesRecomendaciones(current_user):
             Publis2.append(Publis[i])
 
     if len(Publis2) == 0:
-        print("hola", " offset: ", offsetreal, "limite: ", limite)
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
 
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis2)):
-        print("hola soy el id: ", Publis2[x].ids)
         guardaRecomendacion(Publis2[x],finalDictionary,current_user)
         i = i + 1
 
@@ -1240,12 +1215,13 @@ def Recientes(current_user):
     if len(Publis2) == 0:
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
 
+    burbuja(Publis2)
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis2)):
             existe = db.session.query(Propia).filter(Propia.id == Publis2[x].ids ).count()
-
+            print("Se MUESTRA EN ESTE ORDEN: ", Publis2[x].ids)
             if bool(existe):
                 guardaPDF(Publis2[x],finalDictionary,current_user)
                 i = i + 1
@@ -1274,11 +1250,13 @@ def RecientesRecomendaciones(current_user):
 
     if len(Publis2) == 0:
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
-
+    #Publis2.sort(key = orderRecientes, reverse=True)
+    burbuja(Publis2)
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis2)):
+        print("Se MUESTRA EN ESTE ORDEN: ", Publis2[x].ids)
         guardaRecomendacion(Publis2[x],finalDictionary,current_user)
         i = i + 1
 
@@ -1302,10 +1280,12 @@ def RecientesArticulos(current_user):
     if len(Publis2) == 0:
         return jsonify({'fin': 'La lista se ha acabado no hay mas posts'})
 
+    burbuja(Publis2)
     finalDictionary = {}
     i=0
     x=0
     for x in  range(len(Publis2)):
+        print("Se MUESTRA EN ESTE ORDEN: ", Publis2[x].ids)
         guardaPDF(Publis2[x],finalDictionary,current_user)
         i = i + 1
 
@@ -1528,6 +1508,16 @@ def orderRecientes(k):
     
     return k.timestamps
 
+
+def burbuja(vector):
+    for i in range(1,len(vector)):
+        for j in range(0,len(vector)-i):
+            Publi1 = Publicacion.query.filter_by(id=vector[j+1].ids).first()
+            Publi2 = Publicacion.query.filter_by(id=vector[j].ids).first()
+            if(Publi1.timestamp > Publi2.timestamp):
+                aux=vector[j];
+                vector[j]=vector[j+1];
+                vector[j+1]=aux;
 
 def check_email(email):
 
